@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sparta.blog.dto.UserRequestDto;
 import com.sparta.blog.entity.UserRoleEnum;
 import com.sparta.blog.jwt.JwtUtil;
-import com.sparta.blog.result.ApiResponse;
+import com.sparta.blog.exception.Message;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,7 +22,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
-        setFilterProcessesUrl("/api/auth/login");
+        setFilterProcessesUrl("/api/user/login");
     }
 
     @Override
@@ -50,34 +50,20 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
         String token = jwtUtil.createToken(username, role);
         response.addHeader(JwtUtil.AUTHORIZATION_HEADER, token);
-        log.info("로그인 성공!!");
-        response.setStatus(200);
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-
-        ApiResponse apiResponse = new ApiResponse(200, "로그인 성공!!");
-        try {
-            String jsonResponse = new ObjectMapper().writeValueAsString(apiResponse);
-            response.getWriter().write(jsonResponse);
-        } catch (IOException e) {
-            log.error(e.getMessage());
-        }
+        response.setCharacterEncoding("Utf8");
     }
 
     @Override
     protected void unsuccessfulAuthentication(HttpServletRequest request, HttpServletResponse response, AuthenticationException failed) {
-        log.info("로그인 실패!!");
+        log.info("Login 실패");
         response.setStatus(400);
         response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-
-        ApiResponse apiResponse = new ApiResponse(400, "회원을 찾을 수 없습니다.");
+        response.setCharacterEncoding("Utf8");
         try {
-            String jsonResponse = new ObjectMapper().writeValueAsString(apiResponse);
-            response.getWriter().write(jsonResponse);
-        } catch (IOException e) {
+            String json = new ObjectMapper().writeValueAsString(new Message("회원을 찾을 수 없습니다.", 400));
+            response.getWriter().write(json);
+        } catch (Exception e) {
             log.error(e.getMessage());
         }
     }
-
 }

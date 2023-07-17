@@ -1,7 +1,6 @@
 package com.sparta.blog.entity;
 
-import jakarta.persistence.EntityListeners;
-import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.*;
 import lombok.Getter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -12,11 +11,15 @@ import java.time.LocalDateTime;
 @Getter
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
-public abstract class Timestamped { // 추상 클래스
+public abstract class Timestamped {
 
-    @CreatedDate    // @Column(updatable = false), @Temporal(TemporalType.TIMESTAMP) 옵션이 해당 에노테이션으로 처리 됨
+    @CreatedDate
+    @Column(updatable = false)
+    @Temporal(TemporalType.TIMESTAMP)
     private LocalDateTime createdAt;
 
-    @LastModifiedDate   // @Column, @Temporal(TemporalType.TIMESTAMP) 옵션이 해당 에노테이션으로 처리 됨
+    @LastModifiedDate
+    @Column
+    @Temporal(TemporalType.TIMESTAMP)
     private LocalDateTime modifiedAt;
 }

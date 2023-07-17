@@ -2,80 +2,133 @@ package com.sparta.blog.service;
 
 import com.sparta.blog.dto.CommentRequestDto;
 import com.sparta.blog.dto.CommentResponseDto;
-import com.sparta.blog.entity.Blog;
-import com.sparta.blog.entity.Comment;
-import com.sparta.blog.entity.User;
-import com.sparta.blog.entity.UserRoleEnum;
-import com.sparta.blog.repository.BlogRepository;
+import com.sparta.blog.entity.*;
 import com.sparta.blog.repository.CommentRepository;
-import com.sparta.blog.result.ApiResponse;
+import com.sparta.blog.repository.LikeRepository;
+import com.sparta.blog.repository.PostRepository;
+import com.sparta.blog.exception.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
+
 public class CommentService {
 
     private final CommentRepository commentRepository;
-    private final BlogRepository blogRepository;
+    private final PostRepository postRepository;
+    private final LikeRepository likeRepository;
+    private final MessageSource messageSource;
 
-    public CommentResponseDto createComment(Long id, CommentRequestDto requestDto, User user) {
-        Blog blog = findBlog(id);
-        Comment comment = commentRepository.save(new Comment(requestDto, user, blog));
+
+    @Transactional
+    public CommentResponseDto addComment(Long boardId, CommentRequestDto requestDto, User user) {
+        Post post = postRepository.findById(boardId).orElseThrow(
+                () -> new NullPointerException(messageSource.getMessage(
+                        "not.exist.post",
+                        null,
+                        "해당 게시물이 존재하지 않습니다",
+                        Locale.getDefault()
+                ))
+        );
+        Comment comment = commentRepository.save(new Comment(requestDto, user, post));
 
         return new CommentResponseDto(comment);
     }
 
     @Transactional
-    public ResponseEntity<ApiResponse> updateComment(Long commentId, CommentRequestDto requestDto, User user) {
+    public CommentResponseDto updateComment(Long commentId, CommentRequestDto requestDto, User user) {
         Comment comment = findComment(commentId);
-        if (!validateUserOwnership(comment, user)) {
-            ApiResponse apiResponse = new ApiResponse(400, "본인만 수정 가능합니다.");
-            return ResponseEntity.badRequest().body(apiResponse);
+        if(!confirmUser(comment, user)){
+            throw new IllegalArgumentException(messageSource.getMessage(
+                    "not.your.post",
+                    null,
+                    "작성자만 수정이 가능합니다",
+                    Locale.getDefault()
+            ));
         }
-
-        comment.updateComment(requestDto);
-        CommentResponseDto responseDto = new CommentResponseDto(comment);
-        ApiResponse apiResponse = new ApiResponse(200, "댓글 수정 완료!!");
-        return ResponseEntity.ok().body(apiResponse);
+        comment.update(requestDto);
+        return new CommentResponseDto(comment);
     }
 
     @Transactional
-    public ResponseEntity<ApiResponse> deleteComment(Long commentId, User user) {
+    public ResponseEntity<Message> deleteComment(Long commentId, User user) {
         Comment comment = findComment(commentId);
-        if (!validateUserOwnership(comment, user)) {
-            ApiResponse apiResponse = new ApiResponse(400, "본인만 삭제할 수 있습니다.");
-            return ResponseEntity.badRequest().body(apiResponse);
+
+        if(!confirmUser(comment, user)){
+            throw new IllegalArgumentException(messageSource.getMessage(
+                    "not.your.post",
+                    null,
+                    "작성자만 삭제가 가능합니다",
+                    Locale.getDefault()
+            ));
         }
 
         commentRepository.delete(comment);
-        ApiResponse apiResponse = new ApiResponse(200, "댓글 삭제 완료!!");
-        return ResponseEntity.ok().body(apiResponse);
+
+        String msg ="삭제 완료";
+        Message message = new Message(msg, HttpStatus.OK.value());
+        return new ResponseEntity<Message>(message, HttpStatus.OK);
     }
 
-    // 게시글 존재 확인 로직
-    private Blog findBlog(Long id) {
-        return blogRepository.findById(id).orElseThrow(
-                () -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다.")
-        );
-    }
-
-    // 댓글 존재 확인 로직
     private Comment findComment(Long commentId) {
         return commentRepository.findById(commentId).orElseThrow(
-                () -> new IllegalArgumentException("해당 댓글이 존재하지 않습니다.")
+                () -> new NullPointerException(messageSource.getMessage(
+                        "not.exist.comment",
+                        null,
+                        "해당 댓글이 존재하지 않습니다",
+                        Locale.getDefault()
+                ))
         );
     }
 
-    // 작성자 확인 로직
-    private boolean validateUserOwnership(Comment comment, User user) {
+    private boolean confirmUser(Comment comment, User user) {
         UserRoleEnum userRoleEnum = user.getRole();
         return userRoleEnum != UserRoleEnum.USER || Objects.equals(comment.getUser().getId(), user.getId());
+    }
+    @Transactional
+    public ResponseEntity<Message> likeComment(Long id, User user) {
+        Comment comment = findComment(id);
+        if(likeRepository.findByUserAndComment(user, comment).isPresent()){
+            throw new IllegalArgumentException(messageSource.getMessage(
+                    "already.like",
+                    null,
+                    "이미 좋아요 되어 있습니다",
+                    Locale.getDefault()
+            ));
+        }
+        Like like = likeRepository.save(new Like(user, comment));
+        comment.increaseLikeCount();
+        String msg ="좋아요 완료";
+        Message message = new Message(msg, HttpStatus.OK.value());
+        return new ResponseEntity<Message>(message, HttpStatus.OK);
+    }
+    @Transactional
+    public ResponseEntity<Message> deleteLikeComment(Long id, User user) {
+        Comment comment = findComment(id);
+        if(likeRepository.findByUserAndComment(user, comment).isEmpty()){
+            throw new IllegalArgumentException(messageSource.getMessage(
+                    "already.delete.like",
+                    null,
+                    "이미 좋아요 되어 있지 않습니다",
+                    Locale.getDefault()
+            ));
+        }
+        Optional<Like> like = likeRepository.findByUserAndComment(user, comment);
+        likeRepository.delete(like.get());
+        comment.decreaseLikeCount();
+        String msg ="좋아요 취소";
+        Message message = new Message(msg, HttpStatus.OK.value());
+        return new ResponseEntity<Message>(message, HttpStatus.OK);
     }
 }

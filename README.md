@@ -1,9 +1,15 @@
 # SPRING.V4
-Goal:  "Spring Security를 적용한 나만의 블로그 백엔드 서버 만들기"
+"Spring Security를 적용한 나만의 블로그 백엔드 서버 만들기"
 
----
+[Notion 바로가기](https://www.notion.so/verdureko/Spring-Lv-4-0433d348171543138bcd91d92a2446e1)
 
-## 요구사항
+## ERD
+
+<img src="" alt="" width="">
+
+## API 명세서
+
+<img src="" alt="" width="">
 
 1. 회원 가입 API
     

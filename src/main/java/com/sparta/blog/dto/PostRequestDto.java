@@ -3,7 +3,7 @@ package com.sparta.blog.dto;
 import lombok.Getter;
 
 @Getter
-public class BlogRequestDto {
+public class PostRequestDto {
     private String title;
-    private String content;
+    private String contents;
 }
