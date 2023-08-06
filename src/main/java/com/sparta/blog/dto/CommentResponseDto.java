@@ -1,25 +1,26 @@
 package com.sparta.blog.dto;
 
-import com.sparta.blog.entity.Comment;
-import lombok.Getter;
-
 import java.time.LocalDateTime;
 
+import com.sparta.blog.entity.Comment;
+import lombok.Getter;
+import lombok.Setter;
+
 @Getter
-public class CommentResponseDto {
-    private Long id;
+@Setter
+public class CommentResponseDto extends ApiResponseDto {
+    private String body;
     private String username;
-    private String comment;
+    private Integer likeCount;
     private LocalDateTime createdAt;
     private LocalDateTime modifiedAt;
-    private int likeCount;
 
     public CommentResponseDto(Comment comment) {
-        this.id = comment.getId();
+        super();
+        this.body = comment.getBody();
         this.username = comment.getUser().getUsername();
-        this.comment = comment.getComment();
+        this.likeCount = comment.getCommentLikes().size();
         this.createdAt = comment.getCreatedAt();
         this.modifiedAt = comment.getModifiedAt();
-        this.likeCount = comment.getLikeCount();
     }
 }

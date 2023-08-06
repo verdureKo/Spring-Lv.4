@@ -1,125 +1,67 @@
 package com.sparta.blog.service;
 
+import com.sparta.blog.dto.PostListResponseDto;
 import com.sparta.blog.dto.PostRequestDto;
 import com.sparta.blog.dto.PostResponseDto;
-import com.sparta.blog.entity.Like;
 import com.sparta.blog.entity.Post;
 import com.sparta.blog.entity.User;
-import com.sparta.blog.entity.UserRoleEnum;
-import com.sparta.blog.repository.LikeRepository;
-import com.sparta.blog.repository.PostRepository;
-import com.sparta.blog.exception.Message;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.MessageSource;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+public interface PostService {
+	/**
+	 * 게시글 생성
+	 * @param requestDto 게시글 생성 요청정보
+	 * @param user 게시글 생성 요청자
+	 * @return 게시글 생성 결과
+	 */
+	PostResponseDto createPost(PostRequestDto requestDto, User user);
 
-@Service
-@Slf4j
-@RequiredArgsConstructor
+	/**
+	 * 전체 게시글 목록 조회
+	 * @return 전체 게시글 목록
+	 */
+	PostListResponseDto getPosts();
 
-public class PostService {
-    private final PostRepository postRepository;
-    private final LikeRepository likeRepository;
-    private final MessageSource messageSource;
+	/**
+	 * 게시글 단건 조회
+	 * @param id 조회할 게시글 ID
+	 * @return 조회된 게시글 정보
+	 */
+	PostResponseDto getPostById(Long id);
 
+	/**
+	 * 게시글 업데이트
+	 * @param post 업데이트 할 게시글
+	 * @param requestDto 업데이트 할 게시글 정보
+	 * @param user 게시글 업데이트 요청자
+	 * @return 업데이트된 게시글 정보
+	 */
+	PostResponseDto updatePost(Post post, PostRequestDto requestDto, User user);
 
-    public List<PostResponseDto.PostReadResponseDto> getPosts() {
-        return postRepository.findAllByOrderByCreatedAtDesc().stream().map(PostResponseDto.PostReadResponseDto::new).toList();
-    }
+	/**
+	 * 게시글 삭제
+	 * @param post 삭제 요청 게시글
+	 * @param user 게시글 삭제 요청자
+	 */
+	void deletePost(Post post, User user);
 
-    public PostResponseDto.PostBasicResponseDto createPost(PostRequestDto requestDto, User user) {
-        Post post = postRepository.save(new Post(requestDto, user));
-        return new PostResponseDto.PostBasicResponseDto(post);
-    }
+	/**
+	 * 게시글 좋아요
+	 * @param id 좋아요 요청 게시글 ID
+	 * @param user 게시글 좋아요 요청자
+	 */
+	void likePost(Long id, User user);
 
-    public PostResponseDto.PostReadResponseDto getPost(Long id) {
-        Post post = findPost(id);
-        return ResponseEntity.ok().body(new PostResponseDto.PostReadResponseDto(post)).getBody();
-    }
+	/**
+	 * 게시글 좋아요 취소
+	 * @param id 좋아요 취소 요청 게시글 ID
+	 * @param user 게시글 좋아요 취소 요청자
+	 */
+	void deleteLikePost(Long id, User user);
 
-    @Transactional
-    public PostResponseDto.PostReadResponseDto updatePost(Long id, PostRequestDto requestDto, User user) {
-        Post post = findPost(id);
-        confirmUser(post, user);
-        post.update(requestDto);
-        return ResponseEntity.ok().body(new PostResponseDto.PostReadResponseDto(post)).getBody();
-    }
-
-    public ResponseEntity<Message> deletePost(Long id, PostRequestDto requestDto, User user){
-        Post post = findPost(id);
-        confirmUser(post, user);
-        
-        postRepository.delete(post);
-        String msg ="삭제 완료";
-        Message message = new Message(msg, HttpStatus.OK.value());
-        return new ResponseEntity<Message>(message, HttpStatus.OK);
-    }
-
-    private Post findPost(Long id){
-        return postRepository.findById(id).orElseThrow(()->
-                new IllegalArgumentException(messageSource.getMessage(
-                        "not.exist.post",
-                        null,
-                        "해당 게시물이 존재하지 않습니다",
-                        Locale.getDefault()
-                ))
-        );
-    }
-
-    private void confirmUser(Post post, User user) {
-        UserRoleEnum userRoleEnum = user.getRole();
-        if (userRoleEnum == UserRoleEnum.USER && !Objects.equals(post.getUser().getId(), user.getId())) {
-            throw new IllegalArgumentException(messageSource.getMessage(
-                    "not.your.post",
-                    null,
-                    "작성자만 수정 및 삭제가 가능합니다",
-                    Locale.getDefault()
-            ));
-        }
-    }
-
-    @Transactional
-    public ResponseEntity<Message> likePost(Long id, User user) {
-        Post post = findPost(id);
-        if(likeRepository.findByUserAndPost(user, post).isPresent()){
-            throw new IllegalArgumentException(messageSource.getMessage(
-                    "already.like",
-                    null,
-                    "이미 좋아요 되어 있습니다",
-                    Locale.getDefault()
-            ));
-        }
-        Like like = likeRepository.save(new Like(user, post));
-        String msg ="좋아요 완료";
-        Message message = new Message(msg, HttpStatus.OK.value());
-        return new ResponseEntity<Message>(message, HttpStatus.OK);
-    }
-
-    @Transactional
-    public ResponseEntity<Message> deleteLikePost(Long id, User user){
-        Post post = findPost(id);
-        if(likeRepository.findByUserAndPost(user, post).isEmpty()){
-            throw new IllegalArgumentException(messageSource.getMessage(
-                    "already.delete.like",
-                    null,
-                    "이미 좋아요 되어 있지 않습니다",
-                    Locale.getDefault()
-            ));
-        }
-        Optional<Like> like = likeRepository.findByUserAndPost(user, post);
-        likeRepository.delete(like.get());
-        post.decreaseLikeCount();
-        String msg ="좋아요 취소";
-        Message message = new Message(msg, HttpStatus.OK.value());
-        return new ResponseEntity<Message>(message, HttpStatus.OK);
-    }
+	/**
+	 * 게시글 Entity 단건 조회
+	 * @param id 조회할 게시글 ID
+	 * @return 게시글 Entity
+	 */
+	Post findPost(long id);
 }

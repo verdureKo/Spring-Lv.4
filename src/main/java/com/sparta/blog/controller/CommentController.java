@@ -1,50 +1,82 @@
 package com.sparta.blog.controller;
 
+import java.util.concurrent.RejectedExecutionException;
+
+import com.sparta.blog.dto.ApiResponseDto;
 import com.sparta.blog.dto.CommentRequestDto;
 import com.sparta.blog.dto.CommentResponseDto;
 import com.sparta.blog.security.UserDetailsImpl;
-import com.sparta.blog.service.CommentService;
-import com.sparta.blog.exception.Message;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.sun.jdi.request.DuplicateRequestException;
+import com.sparta.blog.entity.Comment;
+import com.sparta.blog.service.CommentService;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api")
-@Slf4j
 @RequiredArgsConstructor
-
 public class CommentController {
 
     private final CommentService commentService;
 
-    @PostMapping("/comment/{postId}")
-    public CommentResponseDto addComment(@PathVariable Long postId, @RequestBody CommentRequestDto requestDto,
-                                         @AuthenticationPrincipal UserDetailsImpl userDetails)
-    {
-        return commentService.addComment(postId, requestDto, userDetails.getUser());
+    @PostMapping("/comments")
+    public ResponseEntity<CommentResponseDto> createComment(@AuthenticationPrincipal UserDetailsImpl userDetails, @RequestBody CommentRequestDto requestDto) {
+        CommentResponseDto result = commentService.createComment(requestDto, userDetails.getUser());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
-    @PutMapping("/comment/{commentId}")
-    public CommentResponseDto updateComment(@PathVariable Long commentId, @RequestBody CommentRequestDto requestDto,
-                                            @AuthenticationPrincipal UserDetailsImpl userDetails)
-    {
-        return commentService.updateComment(commentId, requestDto, userDetails.getUser());
+    @PutMapping("/comments/{id}")
+    public ResponseEntity<ApiResponseDto> updateComment(@AuthenticationPrincipal UserDetailsImpl userDetails, @PathVariable Long id, @RequestBody CommentRequestDto requestDto) {
+        try {
+            Comment comment = commentService.findComment(id);
+            CommentResponseDto result = commentService.updateComment(comment, requestDto, userDetails.getUser());
+            return ResponseEntity.ok().body(result);
+        } catch (RejectedExecutionException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto("작성자만 수정 할 수 있습니다.", HttpStatus.BAD_REQUEST.value()));
+        }
     }
 
-    @DeleteMapping("/comment/{commentId}")
-    public ResponseEntity<Message> deleteComment(@PathVariable Long commentId, @AuthenticationPrincipal UserDetailsImpl userDetails){
-        return commentService.deleteComment(commentId, userDetails.getUser());
-    }
-    @PostMapping("/comment/{commentId}/like")
-    public ResponseEntity<Message> likeBoard (@PathVariable Long commentId, @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        return commentService.likeComment(commentId, userDetails.getUser());
+    @DeleteMapping("/comments/{id}")
+    public ResponseEntity<ApiResponseDto> deleteComment(@AuthenticationPrincipal UserDetailsImpl userDetails, @PathVariable Long id) {
+        try {
+            Comment comment = commentService.findComment(id);
+            commentService.deleteComment(comment, userDetails.getUser());
+            return ResponseEntity.ok().body(new ApiResponseDto("댓글 삭제 성공", HttpStatus.OK.value()));
+        } catch (RejectedExecutionException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto("작성자만 삭제 할 수 있습니다.", HttpStatus.BAD_REQUEST.value()));
+        }
     }
 
-    @DeleteMapping("/comment/{commentId}/like")
-    public ResponseEntity<Message> deleteLikeBoard (@PathVariable Long commentId, @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        return commentService.deleteLikeComment(commentId, userDetails.getUser());
+    @PostMapping("/comments/{id}/like")
+    public ResponseEntity<ApiResponseDto> likeComment(@AuthenticationPrincipal UserDetailsImpl userDetails, @PathVariable Long id) {
+        try {
+            commentService.likeComment(id, userDetails.getUser());
+        } catch (DuplicateRequestException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto(e.getMessage(), HttpStatus.BAD_REQUEST.value()));
+        }
+
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(new ApiResponseDto("댓글 좋아요 성공", HttpStatus.ACCEPTED.value()));
+    }
+
+    @DeleteMapping("/comments/{id}/like")
+    public ResponseEntity<ApiResponseDto> deleteLkeComment(@AuthenticationPrincipal UserDetailsImpl userDetails, @PathVariable Long id) {
+        try {
+            commentService.deleteLikeComment(id, userDetails.getUser());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto(e.getMessage(), HttpStatus.BAD_REQUEST.value()));
+        }
+
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(new ApiResponseDto("댓글 좋아요 취소 성공", HttpStatus.ACCEPTED.value()));
     }
 }

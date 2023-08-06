@@ -1,61 +1,62 @@
 package com.sparta.blog.entity;
 
-import com.sparta.blog.dto.PostRequestDto;
-import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 import java.util.ArrayList;
 import java.util.List;
 
+import com.sparta.blog.dto.PostRequestDto;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 @Entity
 @Getter
-@Setter
-@Table(name="post")
 @NoArgsConstructor
-public class Post extends Timestamped{
+@Table(name = "post")
+public class Post extends TimeStamped {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
     private String title;
-    @Column(nullable = false)
-    private String username;
-    @Column(nullable = false)
-    private String contents;
-    @Column(name = "likes", nullable = false)
-    private int likeCount=0;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @Column(nullable = false)
+    private String content;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id")
     private User user;
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.REMOVE)
-    @OrderBy("id desc")
-    private List<Comment> commentList = new ArrayList<>();
+    private List<Comment> comments = new ArrayList<>();
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.REMOVE)
-    private List<Like> likes = new ArrayList<>();
+    private List<PostLike> postLikes = new ArrayList<>();
 
-    public Post(PostRequestDto requestDto, User user){
+    public Post(PostRequestDto requestDto) {
         this.title = requestDto.getTitle();
-        this.contents = requestDto.getContents();
-        this.username = user.getUsername();
+        this.content = requestDto.getContent();
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public void setUser(User user) {
         this.user = user;
-    }
-
-    public void update(PostRequestDto requestDto){
-        this.title = requestDto.getTitle();
-        this.contents = requestDto.getContents();
-    }
-
-    public void increaseLikeCount(){
-        this.likeCount++;
-    }
-
-    public void decreaseLikeCount(){
-        this.likeCount--;
     }
 }

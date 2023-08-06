@@ -1,47 +1,64 @@
 package com.sparta.blog.controller;
 
-import com.sparta.blog.dto.UserRequestDto;
-import com.sparta.blog.service.UserService;
-import com.sparta.blog.exception.Message;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.MessageSource;
+import com.sparta.blog.dto.ApiResponseDto;
+import com.sparta.blog.dto.AuthRequestDto;
+import com.sparta.blog.jwt.JwtUtil;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Locale;
+import com.sparta.blog.service.UserService;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
-@Slf4j
 @RestController
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@RequestMapping("/api")
 public class UserController {
-
     private final UserService userService;
-    private final MessageSource messageSource;
+    private final JwtUtil jwtUtil;
 
-    @PostMapping("/user/signup")
-    public ResponseEntity<Message> signup(@RequestBody @Valid UserRequestDto.SignupRequestDto requestDto, BindingResult bindingResult) {
-        // Validation 예외처리
-        List<FieldError> fieldErrors = bindingResult.getFieldErrors();
-        if(fieldErrors.size() > 0) {
-            for (FieldError fieldError : bindingResult.getFieldErrors()) {
-                log.error(fieldError.getField() + " 필드 : " + fieldError.getDefaultMessage());
-            }
-            throw new IllegalArgumentException(messageSource.getMessage(
-                    "fail.signup",
-                    null,
-                    "회원가입에 실패하였습니다",
-                    Locale.getDefault()
-            ));
+    @PostMapping("/signup")
+    public ResponseEntity<ApiResponseDto> signUp(@Valid @RequestBody AuthRequestDto requestDto) {
+
+        try {
+            userService.signup(requestDto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto("중복된 username 입니다.", HttpStatus.BAD_REQUEST.value()));
         }
-        return userService.signup(requestDto);
+
+        return ResponseEntity.status(201).body(new ApiResponseDto("회원가입 성공", HttpStatus.CREATED.value()));
+    }
+
+    //로그인
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponseDto> login(@RequestBody AuthRequestDto loginRequestDto, HttpServletResponse response) {
+        try {
+            userService.login(loginRequestDto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponseDto("회원을 찾을 수 없습니다.", HttpStatus.BAD_REQUEST.value()));
+        }
+
+        //JWT 생성 및 쿠키에 저장 후 Response 객체에 추가
+        response.addHeader(JwtUtil.AUTHORIZATION_HEADER, jwtUtil.createToken(loginRequestDto.getUsername(), loginRequestDto.getRole()));
+
+        return ResponseEntity.ok().body(new ApiResponseDto("로그인 성공", HttpStatus.CREATED.value()));
+    }
+
+    @ExceptionHandler({MethodArgumentNotValidException.class})
+    public ResponseEntity<ApiResponseDto> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
+        ApiResponseDto restApiException = new ApiResponseDto(ex.getBindingResult().getAllErrors().get(0).getDefaultMessage(), HttpStatus.BAD_REQUEST.value());
+        return new ResponseEntity<>(
+            // HTTP body
+            restApiException,
+            // HTTP status code
+            HttpStatus.BAD_REQUEST
+        );
     }
 }

@@ -1,8 +1,11 @@
 package com.sparta.blog.dto;
 
 import lombok.Getter;
+import lombok.Setter;
 
 @Getter
+@Setter
 public class CommentRequestDto {
-    private String comment;
+    private Long postId;
+    private String body;
 }
